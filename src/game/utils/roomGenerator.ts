@@ -24,7 +24,7 @@ export class RoomPoolService {
       const json = this.cache.json.get(cacheKey) as PlacedRoom[];
 
       if (!Array.isArray(json) || !Array.isArray(json[0]?.layers)) {
-        throw new Error(`"${cacheKey}" должен быть RawMap[] с .layers: RawLayer[]`);
+        throw new Error(`"${cacheKey}" need RawMap[] from .layers: RawLayer[]`);
       }
 
       if (key === 'start') {

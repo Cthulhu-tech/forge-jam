@@ -20,3 +20,5 @@ type AABB = { minX: number; minY: number; maxX: number; maxY: number; payload?: 
 type CorridorRect = AABB & { kind: 'corridor' };
 type Corridor = { rects: CorridorRect[]; from: PlacedRoom; to: PlacedRoom };
 
+type TilesMeta = { colliding: Set<number> };
+type TilesMetaPack = { walls_and_floor: TilesMeta; decoration: TilesMeta };

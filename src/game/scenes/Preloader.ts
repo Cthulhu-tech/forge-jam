@@ -17,8 +17,8 @@ export class Preloader extends Base {
         this.load.image("decoration", "game/Tiles/decoration.png");
 
         this.load.spritesheet("player", "game/Animations/player.png", {
-            frameWidth: 32,
-            frameHeight: 64,
+            frameWidth: 16,
+            frameHeight: 32,
         });
 
         this.load.bitmapFont('desyrel', 'fonts/minogram_6x10.png', 'fonts/minogram_6x10.xml');
