@@ -1,32 +1,50 @@
-import { Scene, GameObjects } from 'phaser';
+import { Button } from "../utils/button";
+import { Base } from "./Base/Base";
 
-export class MainMenu extends Scene
-{
-    background: GameObjects.Image;
-    logo: GameObjects.Image;
-    title: GameObjects.Text;
-
-    constructor ()
-    {
+export class MainMenu extends Base {
+    constructor () {
         super('MainMenu');
     }
 
-    create ()
-    {
-        this.background = this.add.image(512, 384, 'background');
+    create () {
+        this.rexUI.add.gridSizer({
+            x: 0,
+            y: 0,
+            column: 1,
+            row: 1,
+            columnProportions: [1],
+            rowProportions: [1],
+            anchor: { centerX: '50%', centerY: '50%' },
+        })
+         .add(this.rexUI.add.imageBox(0, 0, 'menu'), 0, 0, 'center-center', 0, true)
+         .layout();
 
-        this.logo = this.add.image(512, 300, 'logo');
+        const group = this.rexUI.add.buttons({
+            x: 400, y: 300,
+            orientation: 'y',
+            space: { item: 20 },
+            buttonsType: 'radio',
+            buttons: [
+                new Button(this, 'menu-button', 'start', 128).getButton(),
+                // new Button(this, 'menu-button', 'option', 128).getButton(),
+                // new Button(this, 'menu-button', 'quit', 128).getButton(),
+            ],
+        })
+            .layout();
 
-        this.title = this.add.text(512, 460, 'Main Menu', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5);
-
-        this.input.once('pointerdown', () => {
-
-            this.scene.start('Game');
-
+        group.on('button.click', (button: Phaser.GameObjects.GameObject) => {
+            const id = button.getData('id');
+            switch (id) {
+                case 'start':
+                this.scene.start('Game');
+                break;
+                case 'option':
+                this.scene.start('Option');
+                break;
+                case 'quit':
+                this.scene.start('Quit');
+                break;
+            }
         });
     }
 }

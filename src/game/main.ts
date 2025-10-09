@@ -1,31 +1,58 @@
-import { Boot } from './scenes/Boot';
-import { GameOver } from './scenes/GameOver';
-import { Game as MainGame } from './scenes/Game';
-import { MainMenu } from './scenes/MainMenu';
-import { AUTO, Game } from 'phaser';
-import { Preloader } from './scenes/Preloader';
+import { Game, WEBGL } from 'phaser';
+import RexUIPlugin from 'phaser3-rex-plugins/templates/ui/ui-plugin.js';
 
-//  Find out more information about the Game Config at:
-//  https://docs.phaser.io/api-documentation/typedef/types-core#gameconfig
+import { GameOver } from './scenes/GameOver';
+import { MainMenu } from './scenes/MainMenu';
+import { Preloader } from './scenes/Preloader';
+import { Game as MainGame } from './scenes/Game';
+import GridEngine from 'grid-engine';
+
 const config: Phaser.Types.Core.GameConfig = {
-    type: AUTO,
-    width: 1024,
-    height: 768,
+    type: WEBGL,
     parent: 'game-container',
-    backgroundColor: '#028af8',
+    backgroundColor: '#000',
     scene: [
-        Boot,
         Preloader,
         MainMenu,
         MainGame,
         GameOver
-    ]
+    ],
+    scale: {
+        width: 800,
+        height: 600,
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        zoom: 1,
+    },
+    fps: {
+        target: 120,
+        min: 30,
+        smoothStep: true,
+    },
+    plugins: {
+        scene: [{
+                key: 'rexUI',
+                plugin: RexUIPlugin,
+                mapping: 'rexUI',
+            },
+            {
+                key: 'gridEngine',
+                plugin: GridEngine,
+                mapping: 'gridEngine',
+            },
+        ],
+    },
+    antialiasGL: false,
+    pixelArt: true,
+    preserveDrawingBuffer: true,
+    roundPixels: true,
+    antialias: false,
+    autoRound: false,
 };
 
 const StartGame = (parent: string) => {
 
     return new Game({ ...config, parent });
-
 }
 
 export default StartGame;

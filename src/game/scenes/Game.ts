@@ -1,35 +1,58 @@
-import { Scene } from 'phaser';
+import { roomNames } from '../../constants/map';
+import { Base } from './Base/Base';
 
-export class Game extends Scene
-{
-    camera: Phaser.Cameras.Scene2D.Camera;
-    background: Phaser.GameObjects.Image;
-    msg_text : Phaser.GameObjects.Text;
+type RawLayer = {
+  name: string;
+  width: number;
+  height: number;
+  data: number[];
+}
 
-    constructor ()
-    {
-        super('Game');
-    }
+type RawMap = {
+  layers: RawLayer[];
+}
 
-    create ()
-    {
-        this.camera = this.cameras.main;
-        this.camera.setBackgroundColor(0x00ff00);
+export class Game extends Base {
+  constructor() {
+    super('Game');
+  }
 
-        this.background = this.add.image(512, 384, 'background');
-        this.background.setAlpha(0.5);
+    create() {
+        const map = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: 100, height: 100 });
 
-        this.msg_text = this.add.text(512, 384, 'Make something fun!\nand share it with us:\nsupport@phaser.io', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        });
-        this.msg_text.setOrigin(0.5);
+        const walls = map.addTilesetImage('walls_and_floor', 'walls_and_floor');
+        const deco = map.addTilesetImage('decoration', 'decoration');
 
-        this.input.once('pointerdown', () => {
+        for (const name of roomNames) {
+          const json = this.cache.json.get(`room_${name}`);
 
-            this.scene.start('GameOver');
+          json.forEach((data: RawMap[]) => {
+            data.forEach(({ layers }) => {
+              layers.forEach(({ data, width, height }) => {
 
-        });
+              });
+            });
+          });
+        }
+
+        const playerSprite = this.add.sprite(0, 0, "player");
+
+        const gridEngineConfig = {
+                characters: [
+                {
+                    id: "player",
+                    sprite: playerSprite,
+                    walkingAnimationMapping: 6,
+                    startPosition: { x: 22, y: 40 },
+                },
+            ],
+            numberOfDirections: 8,
+        };
+
+        this.cameras.main.startFollow(playerSprite, true);
+        this.cameras.main.setFollowOffset(-playerSprite.width, -playerSprite.height);
+
+
+        this.gridEngine.create(map, gridEngineConfig);
     }
 }

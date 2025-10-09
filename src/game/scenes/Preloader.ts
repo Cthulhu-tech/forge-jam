@@ -1,46 +1,57 @@
-import { Scene } from 'phaser';
+import { roomNames } from '../../constants/map';
+import { Base } from './Base/Base';
 
-export class Preloader extends Scene
-{
-    constructor ()
-    {
+
+
+export class Preloader extends Base {
+    constructor () {
         super('Preloader');
     }
 
-    init ()
-    {
-        //  We loaded this image in our Boot Scene, so we can display it here
-        this.add.image(512, 384, 'background');
-
-        //  A simple progress bar. This is the outline of the bar.
-        this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff);
-
-        //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
-        const bar = this.add.rectangle(512-230, 384, 4, 28, 0xffffff);
-
-        //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
-        this.load.on('progress', (progress: number) => {
-
-            //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
-            bar.width = 4 + (460 * progress);
-
-        });
-    }
-
-    preload ()
-    {
-        //  Load the assets for the game - Replace with your own assets
+    preload () {
         this.load.setPath('assets');
+        this.load.image('logo', 'silly.png');
+        this.load.image('menu-button', 'button/menu-button.png');
+        this.load.image('menu', 'menu.png');
+        this.load.image('digger', 'game/digger.png');
+    
+        this.load.image("walls_and_floor", "game/Tiles/walls_and_floor.png");
+        this.load.image("decoration", "game/Tiles/decoration.png");
 
-        this.load.image('logo', 'logo.png');
+        this.load.spritesheet("player", "game/Animations/player.png", {
+            frameWidth: 32,
+            frameHeight: 64,
+        });
+
+        this.load.bitmapFont('desyrel', 'fonts/minogram_6x10.png', 'fonts/minogram_6x10.xml');
+
+        this.load.json("walls_and_floor", "tiles/walls_and_floor.json");
+        this.load.json("decoration", "tiles/decoration.json");
+
+        for (const name of roomNames) {
+            this.load.json(`room_${name}`, `rooms/${name}.json`);
+        }
     }
 
-    create ()
-    {
-        //  When all the assets have loaded, it's often worth creating global objects here that the rest of the game can use.
-        //  For example, you can define global animations here, so we can use them in other scenes.
+    create () {
+        const logo = this.add.image(0, 0, 'logo')
+            .setOrigin(0.5);
 
-        //  Move to the MainMenu. You could also swap this for a Scene Transition, such as a camera fade.
-        this.scene.start('MainMenu');
+        this.rexUI.add.gridSizer({
+            x: 0,
+            y: 0,
+            column: 1,
+            row: 1,
+            columnProportions: [1, 1],
+            rowProportions: [1],
+            anchor: { centerX: '50%', centerY: '50%' },
+        })
+            .add(logo, 0, 0, 'center', 0, false)
+            .layout();
+
+        const timeoutId = setTimeout(() => {
+            clearTimeout(timeoutId);
+            this.scene.start('MainMenu');
+        }, 2000);
     }
 }
