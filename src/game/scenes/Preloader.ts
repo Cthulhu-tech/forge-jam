@@ -1,8 +1,6 @@
 import { roomNames } from '../../constants/map';
 import { Base } from './Base/Base';
 
-
-
 export class Preloader extends Base {
     constructor () {
         super('Preloader');

@@ -18,6 +18,7 @@
         "grid-engine": "^2.48.2",
         "phaser": "^3.90.0",
         "phaser3-rex-plugins": "^1.80.16",
+        "rbush": "^4.0.1",
         "rot-js": "^2.2.1",
         "terser": "^5.39.0"
     }

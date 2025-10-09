@@ -1,16 +1,6 @@
-import { roomNames } from '../../constants/map';
+import { RoomPoolService } from '../utils/roomGenerator';
+import { DoorPlanner, LayoutEngine } from '../utils/roomPlacement';
 import { Base } from './Base/Base';
-
-type RawLayer = {
-  name: string;
-  width: number;
-  height: number;
-  data: number[];
-}
-
-type RawMap = {
-  layers: RawLayer[];
-}
 
 export class Game extends Base {
   constructor() {
@@ -23,17 +13,32 @@ export class Game extends Base {
         const walls = map.addTilesetImage('walls_and_floor', 'walls_and_floor');
         const deco = map.addTilesetImage('decoration', 'decoration');
 
-        for (const name of roomNames) {
-          const json = this.cache.json.get(`room_${name}`);
+        const service = new RoomPoolService({
+          cache: this.cache,
+          seed: this.registry.get('seed') ?? 'level-1',
+          size: { room: 5, next_level: 2 },
+          keyPrefix: 'room_',
+        });
 
-          json.forEach((data: RawMap[]) => {
-            data.forEach(({ layers }) => {
-              layers.forEach(({ data, width, height }) => {
+        const rooms = service.build(['start', 'room', 'next_level']);
 
-              });
-            });
-          });
-        }
+        const seed = String(this.registry.get('seed') ?? 'level-1');
+
+        const engine = new LayoutEngine({
+          seed,
+          mapWidth: 100,
+          mapHeight: 100,
+          roadWidth: 3,
+        });
+
+        const { placed, corridors } = engine.build(rooms);
+        const doorPlanner = new DoorPlanner({ seed, maxDoorWidth: 6 });
+
+        doorPlanner.createDoors(placed, corridors, {
+          doorWallTile: 123,
+        });
+
+        console.log(placed, corridors)
 
         const playerSprite = this.add.sprite(0, 0, "player");
 
