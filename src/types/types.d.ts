@@ -1,24 +1,22 @@
-type RawLayer = {
-  name: string;
-  width: number;
-  height: number;
-  data: number[];
-};
-type RoomKey = 'start' | 'room' | 'next_level';
+type IndexArrs = number[][];
 
-type PlacedRoom = {
-  key: RoomKey;
-  layers: RawLayer[];
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-};
+interface AutoTileConfig {
+  subTile: number;
+  indexArrs: IndexArrs;
+  room: ['library', 'medic', 'start', 'end'];
+  roomFloor: ['glass', 'iron', 'tree', 'ground'];
+  floor: 'glass' | 'iron' | 'tree' | 'ground';
+  floorWall: 'wall';
+  background: 'library' | 'medic' | 'start' | 'end' | 'glass' | 'iron' | 'tree' | 'ground' | 'wall'
+}
 
-type AABB = { minX: number; minY: number; maxX: number; maxY: number; payload?: unknown };
+type BoolGrid = boolean[][];
+type NumGrid  = number[][];
 
-type CorridorRect = AABB & { kind: 'corridor' };
-type Corridor = { rects: CorridorRect[]; from: PlacedRoom; to: PlacedRoom };
-
-type TilesMeta = { colliding: Set<number> };
-type TilesMetaPack = { walls_and_floor: TilesMeta; decoration: TilesMeta };
+interface RotRoomRect {
+  getLeft(): number;
+  getRight(): number;
+  getTop(): number;
+  getBottom(): number;
+  _doors: Record<string, 1>;
+}

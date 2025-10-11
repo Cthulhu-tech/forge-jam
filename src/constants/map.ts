@@ -1,23 +1,20 @@
-export const roomNames = ['start', 'room', 'next_level'];
+export const SUBTILE = 16;
 
-export const first_gid: Record<string, number> = {
-  floor: 1,
-  walls: 1,
-  deco: 193,
-  npc: 193,
-  misc: 193,
-}
-
-export const map_const = {
-    TILE: 16,
-    MAP_W: 50,
-    MAP_H: 50,
-    GE_PROP: 'ge_collide',
-    DOOR_LOCAL_ID: 0,
-    CORRIDOR_FLOOR_LOCAL_ID: 13,
-}
-
-export const size = {
-  room: 8,
-  next_level: 1
-}
+export const INDEX_ARRS: number[][] = [
+  [10,  9,  4,  3], // 0000
+  [10,  9,  4, 13], // 0001
+  [10,  9, 18,  3], // 0010
+  [10,  9, 16, 15], // 0011
+  [10, 43,  4,  3], // 0100
+  [10, 31,  4, 25], // 0101
+  [10,  7,  2,  3], // 0110
+  [10, 31, 16,  5], // 0111
+  [48,  9,  4,  3], // 1000
+  [ 8,  9,  4,  1], // 1001
+  [36,  9, 30,  3], // 1010
+  [36,  9,  6, 15], // 1011
+  [46, 45,  4,  3], // 1100
+  [46, 11,  4, 25], // 1101
+  [12, 45, 30,  3], // 1110
+  [34, 33, 28, 27], // 1111
+];

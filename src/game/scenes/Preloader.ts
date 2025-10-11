@@ -1,4 +1,3 @@
-import { roomNames } from '../../constants/map';
 import { Base } from './Base/Base';
 
 export class Preloader extends Base {
@@ -11,10 +10,6 @@ export class Preloader extends Base {
         this.load.image('logo', 'silly.png');
         this.load.image('menu-button', 'button/menu-button.png');
         this.load.image('menu', 'menu.png');
-        this.load.image('digger', 'game/digger.png');
-    
-        this.load.image("walls_and_floor", "game/Tiles/walls_and_floor.png");
-        this.load.image("decoration", "game/Tiles/decoration.png");
 
         this.load.spritesheet("player", "game/Animations/player.png", {
             frameWidth: 16,
@@ -23,12 +18,15 @@ export class Preloader extends Base {
 
         this.load.bitmapFont('desyrel', 'fonts/minogram_6x10.png', 'fonts/minogram_6x10.xml');
 
-        this.load.json("walls_and_floor", "tiles/walls_and_floor.json");
-        this.load.json("decoration", "tiles/decoration.json");
-
-        for (const name of roomNames) {
-            this.load.json(`room_${name}`, `rooms/${name}.json`);
-        }
+        this.load.image("end", "game/Tiles/end.png");
+        this.load.image("glass", "game/Tiles/glass.png");
+        this.load.image("ground", "game/Tiles/ground.png");
+        this.load.image("iron", "game/Tiles/iron.png");
+        this.load.image("library", "game/Tiles/library.png");
+        this.load.image("medic", "game/Tiles/medic.png");
+        this.load.image("start", "game/Tiles/start.png");
+        this.load.image("tree", "game/Tiles/tree.png");
+        this.load.image("wall", "game/Tiles/wall.png");
     }
 
     create () {
