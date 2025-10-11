@@ -45,9 +45,9 @@ const config: Phaser.Types.Core.GameConfig = {
     antialiasGL: false,
     pixelArt: false,
     preserveDrawingBuffer: false,
-    roundPixels: false,
+    roundPixels: true,
     antialias: false,
-    autoRound: false,
+    autoRound: true,
 };
 
 const StartGame = (parent: string) => {
