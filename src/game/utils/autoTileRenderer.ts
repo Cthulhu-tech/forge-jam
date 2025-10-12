@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import * as ROT from 'rot-js';
 import Digger from 'rot-js/lib/map/digger';
-import { INDEX_ARRS } from '../../constants/map';
+import { INDEX_ARRS, TILECOUNT_PER_SET } from '../../constants/map';
 import { AutoTileMath } from './autoTileMath';
 
 export class AutoTileRenderer {
@@ -19,306 +19,271 @@ export class AutoTileRenderer {
 
     ROT.RNG.setSeed(seed);
     this.digger = new ROT.Map.Digger(this.w, this.h, {
-      roomWidth:      [4, 10],
-      roomHeight:     [4, 10],
+      roomWidth: [4, 10],
+      roomHeight: [4, 10],
       corridorLength: [2, 8],
-      dugPercentage:  .45,
+      dugPercentage: 0.45,
     });
   }
 
   createTilemap(): { map: Phaser.Tilemaps.Tilemap } {
-    const { subTile } = this.cfg;
+    this.digger.create();
 
     const map = this.scene.make.tilemap({
-      tileWidth: subTile,
-      tileHeight: subTile,
+      tileWidth: this.cfg.subTile,
+      tileHeight: this.cfg.subTile,
       width: this.w * 2,
       height: this.h * 2,
     });
 
-    const registerTileset = (key: string): Phaser.Tilemaps.Tileset =>
-      map.addTilesetImage(key, key, subTile, subTile, 0, 0) as Phaser.Tilemaps.Tileset;
+    let nextFirstGid = 1;
 
-    const tilesetBase     = registerTileset(this.cfg.floorWall);
-    const tilesetCorridor = registerTileset(this.cfg.floor);
+    const registerTileset = (keys: string[]) => {
+      const out: Record<string, Phaser.Tilemaps.Tileset> = {};
 
-    const makeLayer = (
-      name: string,
-      ts: Phaser.Tilemaps.Tileset,
-      depth: number
-    ): Phaser.Tilemaps.TilemapLayer => {
-      const layer = map.createBlankLayer(name, ts, 0, 0);
-      if (!layer) throw new Error(`Failed to create layer: ${name}`);
-      layer.setDepth(depth);
-      return layer;
+      for (const key of keys) {
+        const ts = map.addTilesetImage(
+          key,
+          key,
+          this.cfg.subTile,
+          this.cfg.subTile,
+          0,
+          0,
+          nextFirstGid
+        ) as Phaser.Tilemaps.Tileset;
+
+        out[key] = ts;
+        nextFirstGid += TILECOUNT_PER_SET;
+      }
+
+      return out;
     };
 
-    const baseLayer     = makeLayer('BaseFloorWall', tilesetBase, 0);
-    const corridorLayer = makeLayer('CorridorFloor', tilesetCorridor, 1);
+    const tilesetsVoid     = registerTileset([this.cfg.floorWall]);
+    const tilesetsRooms    = registerTileset([...this.cfg.room]);
+    const tilesetsCorridor = registerTileset([this.cfg.floor]);
+    const tilesetsRoomFlr  = registerTileset([...this.cfg.roomFloor]);
 
-    let dug: BoolGrid = this.buildDugMask();
+    const solidLayer = map.createBlankLayer(
+      'Solid',
+      [tilesetsVoid[this.cfg.floorWall], ...Object.values(tilesetsRooms)],
+      0
+    ) as Phaser.Tilemaps.TilemapLayer;
+
+    const floorLayer = map.createBlankLayer(
+      'Floor',
+      [tilesetsCorridor[this.cfg.floor], ...Object.values(tilesetsRoomFlr)],
+      1
+    ) as Phaser.Tilemaps.TilemapLayer;
+
+    const dug = this.buildDugMask();
     const rooms = this.digger.getRooms() as RotRoomRect[];
-    dug = this.connectAllRooms(dug, rooms);
 
-    const roomMask = this.mergeRoomRects(rooms);
-    const corridorMask = this.diff(dug, roomMask);
+    const roomInteriorMask = this.mergeRoomRects(rooms);
+    const corridorMask     = this.diff(roomInteriorMask, dug, true);
+    const voidMask         = this.not(dug);
 
-    this.paintBase(baseLayer, true, dug);
+    const roomWalls: Array<{ mask: boolean[][]; tilesetKey: string }> = [];
+    for (const room of rooms) {
+      const interior = this.rectMask(room.getLeft(), room.getTop(), room.getRight(), room.getBottom());
+      const walls    = this.innerPerimeterMaskMinusDoors(interior, corridorMask);
+      const wallKey  = this.pickFromTuple(this.cfg.room);
 
-    const corridorMaskForBase = this.corridorMaskWithoutRoomEdges(corridorMask, roomMask);
-    this.paintMaskAutotile(baseLayer, corridorMaskForBase, false);
+      roomWalls.push({ mask: walls, tilesetKey: wallKey });
+    }
 
-    this.paintMaskAutotile(baseLayer, roomMask, false);
-    this.paintMaskAutotile(corridorLayer, corridorMask, false);
+    const roomFloors: Array<{ mask: boolean[][]; tilesetKey: string }> = [];
+    for (let i = 0; i < rooms.length; i++) {
+      const r     = rooms[i];
+      const floor = this.rectMask(r.getLeft(), r.getTop(), r.getRight(), r.getBottom());
+      const walls = roomWalls[i].mask;
 
-    rooms.forEach((room, i) => {
-      const roomWallKey  = this.pickFromTuple(this.cfg.room);
-      const roomFloorKey = this.pickFromTuple(this.cfg.roomFloor);
+      const interiorNoWalls = this.andNot(floor, walls);
+      const floorKey        = this.pickFromTuple(this.cfg.roomFloor);
 
-      const tsRoomWall  = registerTileset(roomWallKey);
-      const tsRoomFloor = registerTileset(roomFloorKey);
+      roomFloors.push({ mask: interiorNoWalls, tilesetKey: floorKey });
+    }
 
-      const roomFloorLayer = makeLayer(`Room${i}_Floor_${roomFloorKey}`, tsRoomFloor, 2);
-      const roomWallLayer  = makeLayer(`Room${i}_Wall_${roomWallKey}`,  tsRoomWall,  3);
-      
-      const interiorMask = this.rectMask(
-        room.getLeft(),
-        room.getTop(),
-        room.getRight(),
-        room.getBottom()
-      );
+    const solidCombined = this.orMany([voidMask, ...roomWalls.map(r => r.mask)]);
+    const floorCombined = this.andNot(
+      this.orMany([corridorMask, ...roomFloors.map(r => r.mask)]),
+      solidCombined
+    );
 
-      const innerPerimeterNoDoors = this.innerPerimeterMaskMinusDoors(interiorMask, corridorMask);
+    this.paintCompositeAutotile(
+      solidLayer,
+      solidCombined,
+      [{ mask: voidMask, tilesetKey: this.cfg.floorWall }, ...roomWalls],
+      true,
+      { [this.cfg.floorWall]: tilesetsVoid[this.cfg.floorWall], ...tilesetsRooms }
+    );
 
-      this.paintMaskAutotile(roomFloorLayer, interiorMask, false);
-      this.paintMaskAutotile(roomWallLayer,  innerPerimeterNoDoors, true);
-    });
+    this.paintCompositeAutotile(
+      floorLayer,
+      floorCombined,
+      [{ mask: corridorMask, tilesetKey: this.cfg.floor }, ...roomFloors],
+      false,
+      { [this.cfg.floor]: tilesetsCorridor[this.cfg.floor], ...tilesetsRoomFlr }
+    );
 
     return { map };
   }
 
-  private corridorMaskWithoutRoomEdges(corridorMask: BoolGrid, roomMask: BoolGrid): BoolGrid {
-    const out: BoolGrid = corridorMask.map(row => row.slice());
-    const n4: ReadonlyArray<readonly [number, number]> = [[1,0],[-1,0],[0,1],[0,-1]] as const;
+  private makeMask(fill = false) {
+    const m: boolean[][] = new Array(this.h);
 
     for (let y = 0; y < this.h; y++) {
+      m[y] = new Array(this.w);
+
       for (let x = 0; x < this.w; x++) {
-        if (!corridorMask[y][x]) continue;
-
-        let touchesRoom = false;
-        for (const [dx, dy] of n4) {
-          const nx = x + dx, ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= this.w || ny >= this.h) continue;
-          if (roomMask[ny][nx]) { touchesRoom = true; break; }
-        }
-
-        if (touchesRoom) out[y][x] = false;
+        m[y][x] = fill;
       }
     }
-    return out;
+
+    return m;
   }
 
-  private connectAllRooms(dug: BoolGrid, rooms: RotRoomRect[]): BoolGrid {
-    if (rooms.length <= 1) return dug;
+  private inBounds(x: number, y: number) {
+    return x >= 0 && y >= 0 && x < this.w && y < this.h;
+  }
 
-    const centers = rooms.map(r => {
-      const cx = Math.floor((r.getLeft() + r.getRight()) / 2);
-      const cy = Math.floor((r.getTop()  + r.getBottom()) / 2);
-      return { x: this.clamp(cx, 0, this.w - 1), y: this.clamp(cy, 0, this.h - 1) };
+  private buildDugMask() {
+    const m = this.makeMask(false);
+
+    this.digger.create((x: number, y: number, v: number) => {
+      if (v === 0) {
+        m[y][x] = true;
+      }
     });
 
-    const connected: boolean[] = Array(centers.length).fill(false);
-    connected[0] = true;
-
-    for (let k = 1; k < centers.length; k++) {
-      let bestA = -1, bestB = -1, bestDist = Number.POSITIVE_INFINITY;
-
-      for (let i = 0; i < centers.length; i++) if (connected[i]) {
-        for (let j = 0; j < centers.length; j++) if (!connected[j]) {
-          const d = Math.abs(centers[i].x - centers[j].x) + Math.abs(centers[i].y - centers[j].y);
-          if (d < bestDist) { bestDist = d; bestA = i; bestB = j; }
-        }
-      }
-
-      if (bestA !== -1 && bestB !== -1) {
-        this.carveLPath(dug, centers[bestA], centers[bestB]);
-        connected[bestB] = true;
-      }
-    }
-
-    return this.ensureSingleComponent(dug);
+    return m;
   }
 
-  private carveLPath(dug: BoolGrid, a: {x:number,y:number}, b: {x:number,y:number}): void {
-    const firstHorizontal = ROT.RNG.getUniform() < 0.5;
+  private mergeRoomRects(rooms: RotRoomRect[]) {
+    const m = this.makeMask(false);
 
-    if (firstHorizontal) {
-      this.carveLineX(dug, a.x, b.x, a.y);
-      this.carveLineY(dug, a.y, b.y, b.x);
-    } else {
-      this.carveLineY(dug, a.y, b.y, a.x);
-      this.carveLineX(dug, a.x, b.x, b.y);
-    }
-  }
-
-  private carveLineX(dug: BoolGrid, x1: number, x2: number, y: number): void {
-    const step = x2 >= x1 ? 1 : -1;
-    for (let x = x1; x !== x2 + step; x += step) {
-      if (y >= 0 && y < this.h && x >= 0 && x < this.w) dug[y][x] = true;
-    }
-  }
-
-  private carveLineY(dug: BoolGrid, y1: number, y2: number, x: number): void {
-    const step = y2 >= y1 ? 1 : -1;
-    for (let y = y1; y !== y2 + step; y += step) {
-      if (y >= 0 && y < this.h && x >= 0 && x < this.w) dug[y][x] = true;
-    }
-  }
-
-  private ensureSingleComponent(dug: BoolGrid): BoolGrid {
-    const comp = this.labelComponents(dug);
-    if (comp.count <= 1) return dug;
-
-    let mainId = 0, mainSize = 0;
-    for (let id = 1; id <= comp.count; id++) {
-      if ((comp.sizes.get(id) ?? 0) > mainSize) {
-        mainSize = comp.sizes.get(id)!;
-        mainId = id;
-      }
-    }
-
-    const reps: Record<number, {x:number,y:number}[]> = {};
-    for (let y = 0; y < this.h; y++) {
-      for (let x = 0; x < this.w; x++) {
-        const id = comp.ids[y][x];
-        if (id <= 0) continue;
-        if (!reps[id]) reps[id] = [];
-        if ((x + y) % 7 === 0) reps[id].push({x,y});
-      }
-    }
-
-    const mainPts = reps[mainId] ?? [];
-    for (let id = 1; id <= comp.count; id++) {
-      if (id === mainId) continue;
-      const pts = reps[id] ?? [];
-      if (pts.length === 0 || mainPts.length === 0) continue;
-
-      let bestA: {x:number,y:number}|null = null;
-      let bestB: {x:number,y:number}|null = null;
-      let bestD = Number.POSITIVE_INFINITY;
-
-      for (const a of pts) {
-        for (const b of mainPts) {
-          const d = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-          if (d < bestD) { bestD = d; bestA = a; bestB = b; }
-        }
-      }
-
-      if (bestA && bestB) this.carveLPath(dug, bestA, bestB);
-    }
-
-    return dug;
-  }
-
-  private labelComponents(mask: BoolGrid): {
-    ids: number[][];
-    count: number;
-    sizes: Map<number, number>;
-  } {
-    const ids: number[][] = Array.from({ length: this.h }, () => Array(this.w).fill(0));
-    const sizes = new Map<number, number>();
-    let curId = 0;
-    const n4: ReadonlyArray<readonly [number, number]> = [[1,0],[-1,0],[0,1],[0,-1]] as const;
-
-    for (let y = 0; y < this.h; y++) {
-      for (let x = 0; x < this.w; x++) {
-        if (!mask[y][x] || ids[y][x] !== 0) continue;
-        curId++;
-        let size = 0;
-        const q: Array<[number, number]> = [[x, y]];
-        ids[y][x] = curId;
-
-        while (q.length) {
-          const [cx, cy] = q.pop()!;
-          size++;
-          for (const [dx, dy] of n4) {
-            const nx = cx + dx, ny = cy + dy;
-            if (nx < 0 || ny < 0 || nx >= this.w || ny >= this.h) continue;
-            if (!mask[ny][nx] || ids[ny][nx] !== 0) continue;
-            ids[ny][nx] = curId;
-            q.push([nx, ny]);
-          }
-        }
-        sizes.set(curId, size);
-      }
-    }
-    return { ids, count: curId, sizes };
-  }
-
-  private clamp(v:number, min:number, max:number) { return Math.max(min, Math.min(max, v)); }
-
-  private buildDugMask(): BoolGrid {
-    const dug: BoolGrid = Array.from({ length: this.h }, () => Array(this.w).fill(false));
-    this.digger.create((x: number, y: number, value: number) => {
-      if (value === 0) dug[y][x] = true;
-    });
-    return dug;
-  }
-
-  private mergeRoomRects(rooms: RotRoomRect[]): BoolGrid {
-    const mask: BoolGrid = Array.from({ length: this.h }, () => Array(this.w).fill(false));
     for (const r of rooms) {
       const L = r.getLeft();
       const R = r.getRight();
       const T = r.getTop();
       const B = r.getBottom();
+
       for (let y = T; y <= B; y++) {
         if (y < 0 || y >= this.h) continue;
+
         for (let x = L; x <= R; x++) {
           if (x < 0 || x >= this.w) continue;
-          mask[y][x] = true;
+
+          m[y][x] = true;
         }
       }
     }
-    return mask;
+
+    return m;
   }
 
-  private diff(a: BoolGrid, b: BoolGrid): BoolGrid {
-    const out: BoolGrid = Array.from({ length: this.h }, () => Array(this.w).fill(false));
-    for (let y = 0; y < this.h; y++) {
-      for (let x = 0; x < this.w; x++) {
-        out[y][x] = a[y][x] && !b[y][x];
+  private rectMask(left: number, top: number, right: number, bottom: number) {
+    const m = this.makeMask(false);
+
+    for (let y = top; y <= bottom; y++) {
+      if (y < 0 || y >= this.h) continue;
+
+      for (let x = left; x <= right; x++) {
+        if (x < 0 || x >= this.w) continue;
+
+        m[y][x] = true;
       }
     }
+
+    return m;
+  }
+
+  private diff(a: boolean[][], b: boolean[][], reverse = false) {
+    const out = this.makeMask(false);
+
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        if (!reverse) {
+          out[y][x] = a[y][x] && !b[y][x];
+        } else {
+          out[y][x] = b[y][x] && !a[y][x];
+        }
+      }
+    }
+
     return out;
   }
 
-  private rectMask(left: number, top: number, right: number, bottom: number): BoolGrid {
-    const mask: BoolGrid = Array.from({ length: this.h }, () => Array(this.w).fill(false));
-    for (let y = top; y <= bottom; y++) {
-      if (y < 0 || y >= this.h) continue;
-      for (let x = left; x <= right; x++) {
-        if (x < 0 || x >= this.w) continue;
-        mask[y][x] = true;
+  private not(a: boolean[][]) {
+    const out = this.makeMask(false);
+
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        out[y][x] = !a[y][x];
       }
     }
-    return mask;
+
+    return out;
   }
 
-  private innerPerimeterMaskMinusDoors(interior: BoolGrid, corridorMask: BoolGrid): BoolGrid {
-    const out: BoolGrid = Array.from({ length: this.h }, () => Array(this.w).fill(false));
-    const n4: ReadonlyArray<readonly [number, number]> = [[1,0],[-1,0],[0,1],[0,-1]] as const;
+  private orMany(masks: boolean[][][]) {
+    const out = this.makeMask(false);
 
-    const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < this.w && y < this.h;
+    for (const m of masks) {
+      for (let y = 0; y < this.h; y++) {
+        for (let x = 0; x < this.w; x++) {
+          if (m?.[y]?.[x]) {
+            out[y][x] = true;
+          }
+        }
+      }
+    }
 
-    const isRealDoor = (nx: number, ny: number, dx: number, dy: number): boolean => {
-      if (!inBounds(nx, ny) || !corridorMask[ny][nx]) return false;
-      const fx = nx + dx, fy = ny + dy;
-      const forward = inBounds(fx, fy) && corridorMask[fy][fx];
-      const lx = nx + dy,  ly = ny - dx;
-      const rx = nx - dy,  ry = ny + dx;
-      const side = (inBounds(lx, ly) && corridorMask[ly][lx]) ||
-                   (inBounds(rx, ry) && corridorMask[ry][rx]);
+    return out;
+  }
+
+  private andNot(a: boolean[][], b: boolean[][]) {
+    const out = this.makeMask(false);
+
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        out[y][x] = !!a?.[y]?.[x] && !b?.[y]?.[x];
+      }
+    }
+
+    return out;
+  }
+
+  private innerPerimeterMaskMinusDoors(interior: boolean[][], corridorMask: boolean[][]) {
+    const out = this.makeMask(false);
+    const n4: ReadonlyArray<readonly [number, number]> = [
+      [ 1, 0],
+      [-1, 0],
+      [ 0, 1],
+      [ 0,-1],
+    ];
+
+    const isDoor = (nx: number, ny: number, dx: number, dy: number) => {
+      if (!this.inBounds(nx, ny)) return false;
+      if (!corridorMask[ny][nx])  return false;
+
+      const fx = nx + dx;
+      const fy = ny + dy;
+
+      const forward =
+        this.inBounds(fx, fy) &&
+        corridorMask[fy][fx];
+
+      const lx = nx + dy;
+      const ly = ny - dx;
+
+      const rx = nx - dy;
+      const ry = ny + dx;
+
+      const side =
+        (this.inBounds(lx, ly) && corridorMask[ly][lx]) ||
+        (this.inBounds(rx, ry) && corridorMask[ry][rx]);
+
       return forward || side;
     };
 
@@ -326,70 +291,81 @@ export class AutoTileRenderer {
       for (let x = 0; x < this.w; x++) {
         if (!interior[y][x]) continue;
 
-        let touchesOutside = false;
-        let hasDoor = false;
-        let insideNeighbors = 0;
+        let edge = false;
+        let door = false;
 
         for (const [dx, dy] of n4) {
-          const nx = x + dx, ny = y + dy;
-          const inN = inBounds(nx, ny) && interior[ny][nx];
-          if (inN) insideNeighbors++;
-        }
+          const nx = x + dx;
+          const ny = y + dy;
 
-        if (insideNeighbors < 4) touchesOutside = true;
+          const inside =
+            this.inBounds(nx, ny) &&
+            interior[ny][nx];
 
-        const isCorner = (insideNeighbors === 2);
-        if (touchesOutside && isCorner) {
-          out[y][x] = true;
-          continue;
-        }
+          if (!inside) {
+            edge = true;
 
-        if (touchesOutside) {
-          for (const [dx, dy] of n4) {
-            const nx = x + dx, ny = y + dy;
-            const neighborInside = inBounds(nx, ny) && interior[ny][nx];
-            if (!neighborInside && isRealDoor(nx, ny, dx, dy)) {
-              hasDoor = true;
+            if (isDoor(nx, ny, dx, dy)) {
+              door = true;
               break;
             }
           }
         }
 
-        out[y][x] = touchesOutside && !hasDoor;
+        out[y][x] = edge && !door;
       }
     }
+
     return out;
   }
 
-  private paintBase(
+  private paintCompositeAutotile(
     layer: Phaser.Tilemaps.TilemapLayer,
+    combinedMask: boolean[][],
+    sources: Array<{ mask: boolean[][]; tilesetKey: string }>,
     collidable: boolean,
-    skipMask?: BoolGrid
-  ): void {
-    const baseMask: BoolGrid = Array.from({ length: this.h }, (_, y) =>
-      Array.from({ length: this.w }, (_, x) => !(skipMask?.[y]?.[x] ?? false))
-    );
-    this.paintMaskAutotile(layer, baseMask, collidable);
-  }
+    tilesetMap: Record<string, Phaser.Tilemaps.Tileset>
+  ) {
+    const ids = combinedMask.map(row => row.map(v => (v ? 1 : 0)));
 
-  private paintMaskAutotile(layer: Phaser.Tilemaps.TilemapLayer, mask: BoolGrid, collidable: boolean): void {
-    const ids: NumGrid = mask.map(row => row.map(v => (v ? 1 : 0)));
+    const pickKey = (x: number, y: number) => {
+      for (const s of sources) {
+        if (s.mask?.[y]?.[x]) {
+          return s.tilesetKey;
+        }
+      }
+      return null;
+    };
+
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
-        if (ids[y][x] === 0) continue;
+        if (!combinedMask[y][x]) continue;
 
-        const arr = AutoTileMath.quad(this.cfg.indexArrs ?? INDEX_ARRS, ids, x, y, this.w, this.h);
-        const tl = this.toZeroBased(arr[0]);
-        const tr = this.toZeroBased(arr[1]);
-        const bl = this.toZeroBased(arr[2]);
-        const br = this.toZeroBased(arr[3]);
+        const quad = AutoTileMath.quad(
+          this.cfg.indexArrs ?? INDEX_ARRS,
+          ids,
+          x,
+          y,
+          this.w,
+          this.h
+        );
 
-        const sx = x * 2;
-        const sy = y * 2;
-        this.putTileWithCollision(layer, tl, sx,     sy,     collidable);
-        this.putTileWithCollision(layer, tr, sx + 1, sy,     collidable);
-        this.putTileWithCollision(layer, bl, sx,     sy + 1, collidable);
-        this.putTileWithCollision(layer, br, sx + 1, sy + 1, collidable);
+        const tl = this.toZeroBased(quad[0]);
+        const tr = this.toZeroBased(quad[1]);
+        const bl = this.toZeroBased(quad[2]);
+        const br = this.toZeroBased(quad[3]);
+
+        const key = pickKey(x, y);
+        if (!key) continue;
+
+        const ts  = tilesetMap[key];
+        const sx  = x * 2;
+        const sy  = y * 2;
+
+        this.putTileWithCollision(layer, ts.firstgid + tl, sx,     sy,     collidable);
+        this.putTileWithCollision(layer, ts.firstgid + tr, sx + 1, sy,     collidable);
+        this.putTileWithCollision(layer, ts.firstgid + bl, sx,     sy + 1, collidable);
+        this.putTileWithCollision(layer, ts.firstgid + br, sx + 1, sy + 1, collidable);
       }
     }
   }
@@ -400,19 +376,20 @@ export class AutoTileRenderer {
     x: number,
     y: number,
     collidable: boolean
-  ): void {
+  ) {
     const tile = layer.putTileAt(tileIndex, x, y, true);
+
     if (tile) {
       (tile.properties as Record<string, unknown>)['ge_colide'] = collidable;
     }
   }
 
-  private toZeroBased(idx1to48: number): number {
+  private toZeroBased(idx1to48: number) {
     const idx = Math.max(1, Math.min(48, idx1to48));
     return idx - 1;
   }
 
-  private pickFromTuple<T extends string>(tuple: readonly T[]): T {
+  private pickFromTuple<T extends string>(tuple: readonly T[]) {
     const idx = ROT.RNG.getUniformInt(0, tuple.length - 1);
     return tuple[idx];
   }

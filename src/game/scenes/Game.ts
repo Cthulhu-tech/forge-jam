@@ -29,8 +29,8 @@ export class Game extends Base {
           id: 'player',
           sprite: playerSprite,
           startPosition: {
-            x: 19,
-            y: 18,
+            x: 18,
+            y: 20,
           },
           speed: 6,
           walkingAnimationMapping: 6
@@ -43,7 +43,7 @@ export class Game extends Base {
     const cam = this.cameras.main;
 
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
-    cam.setZoom(1);
+    cam.setZoom(2);
 
     cam.startFollow(playerSprite, true, 0.15, 0.15);
     cam.setRoundPixels(true);

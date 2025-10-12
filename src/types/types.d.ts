@@ -1,5 +1,3 @@
-type IndexArrs = number[][];
-
 interface AutoTileConfig {
   subTile: number;
   indexArrs: IndexArrs;
@@ -10,13 +8,10 @@ interface AutoTileConfig {
   background: 'library' | 'medic' | 'start' | 'end' | 'glass' | 'iron' | 'tree' | 'ground' | 'wall'
 }
 
-type BoolGrid = boolean[][];
-type NumGrid  = number[][];
-
 interface RotRoomRect {
   getLeft(): number;
   getRight(): number;
   getTop(): number;
   getBottom(): number;
-  _doors: Record<string, 1>;
 }
+

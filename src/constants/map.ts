@@ -1,4 +1,5 @@
 export const SUBTILE = 16;
+export const TILECOUNT_PER_SET = 48;
 
 export const INDEX_ARRS: number[][] = [
   [10,  9,  4,  3], // 0000
