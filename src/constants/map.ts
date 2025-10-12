@@ -19,3 +19,48 @@ export const INDEX_ARRS: number[][] = [
   [12, 45, 30,  3], // 1110
   [34, 33, 28, 27], // 1111
 ];
+
+export const roomPrefabs = [
+  {
+    wallKey: 'library',
+    floorKey: 'tree',
+    shape: [[1,1,1],[1,1,1],[1,1,1]],
+    percent: 25,
+    min: 2
+  },
+  {
+    wallKey: 'medic',
+    floorKey: 'medic',
+    shape: [
+      [1, 1, 1],
+      [1, 1, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+      [1, 1, 1],
+    ],
+    count: 1,
+  },
+  {
+    wallKey: 'start',
+    floorKey: 'glass',
+    shape: [[1]],
+    count: 1,
+    max: 1
+  },
+  {
+    wallKey: 'end',
+    floorKey: 'medic',
+    shape: [[1]],
+    count: 1,
+    max: 1
+  },
+  {
+    wallKey: 'library',
+    floorKey: 'tree',
+    shape: [
+      [1,1,1,1],
+      [1,1,1,1]
+    ],
+    weight: 1 
+  }
+];

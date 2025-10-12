@@ -1,4 +1,4 @@
-import { INDEX_ARRS, SUBTILE } from '../../constants/map';
+import { INDEX_ARRS, roomPrefabs, SUBTILE } from '../../constants/map';
 import { AutoTileRenderer } from '../utils/autoTileRenderer';
 import { Base } from './Base/Base';
 
@@ -7,21 +7,25 @@ const cfg: AutoTileConfig = {
   indexArrs: INDEX_ARRS,
   room: ['library', 'medic', 'start', 'end'],
   roomFloor: ['glass', 'iron', 'tree', 'ground'],
-  floor: 'ground',
+  floor: 'iron',
   floorWall: 'wall',
-  background: 'tree',
-}
+  background: 'iron',
+  roomPrefabs,
+};
+
 
 export class Game extends Base {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-  constructor() { super('Game'); }
+  constructor() {
+    super('Game');
+  }
 
   create() {
     const playerSprite = this.add
       .sprite(16, 32, 'player', 0)
       .setOrigin(0.5, 1);
 
-    const renderer = new AutoTileRenderer(this, cfg, 50, 50, 12345);
+    const renderer = new AutoTileRenderer(this, cfg, 55, 55, 12345);
     const { map } = renderer.createTilemap();
 
     this.gridEngine.create(map, {
@@ -29,21 +33,21 @@ export class Game extends Base {
           id: 'player',
           sprite: playerSprite,
           startPosition: {
-            x: 18,
-            y: 20,
+            x: 28,
+            y: 24,
           },
-          speed: 6,
-          walkingAnimationMapping: 6
+          speed: 20,
+          walkingAnimationMapping: 8
         }
       ],
-      numberOfDirections: 8,
+      numberOfDirections: 4,
       collisionTilePropertyName: 'ge_colide',
     });
 
     const cam = this.cameras.main;
 
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
-    cam.setZoom(2);
+    cam.setZoom(1);
 
     cam.startFollow(playerSprite, true, 0.15, 0.15);
     cam.setRoundPixels(true);
