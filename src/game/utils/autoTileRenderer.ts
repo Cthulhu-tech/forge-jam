@@ -38,13 +38,15 @@ export class AutoTileRenderer {
 
     const prefabWallKeys = Array.from(new Set((this.cfg.roomPrefabs ?? []).map(p => p.wallKey))).filter(Boolean);
     const prefabFloorKeys = Array.from(new Set((this.cfg.roomPrefabs ?? []).map(p => p.floorKey))).filter(Boolean);
+    const envKeys = Array.from(new Set((this.cfg.roomPrefabs ?? []).flatMap(p => (p.environments ?? []).map(e => e.element)))).filter(Boolean);
+
     const roomWallKeysAll = Array.from(new Set<string>([...this.cfg.room, ...prefabWallKeys]));
     const roomFloorKeysAll = Array.from(new Set<string>([...this.cfg.roomFloor, ...prefabFloorKeys]));
-
     const tilesetsVoid = registerTileset([this.cfg.floorWall]);
     const tilesetsRooms = registerTileset(roomWallKeysAll);
     const tilesetsCorridor = registerTileset([this.cfg.floor]);
     const tilesetsRoomFlr = registerTileset(roomFloorKeysAll);
+    const tilesetsEnv = registerTileset(envKeys);
 
     const solidLayer = map.createBlankLayer('Solid', [tilesetsVoid[this.cfg.floorWall], ...Object.values(tilesetsRooms)], 0) as Phaser.Tilemaps.TilemapLayer;
     const floorLayer = map.createBlankLayer('Floor', [tilesetsCorridor[this.cfg.floor], ...Object.values(tilesetsRoomFlr)], 1) as Phaser.Tilemaps.TilemapLayer;
@@ -58,6 +60,7 @@ export class AutoTileRenderer {
     const roomInteriorMasks: BoolGrid[] = [];
     const roomWallKeys: string[] = [];
     const roomFloorKeys: string[] = [];
+    const roomEnvs: EnvDef[][] = [];
 
     for (let i = 0; i < rooms.length; i++) {
       const r = rooms[i];
@@ -72,6 +75,7 @@ export class AutoTileRenderer {
         roomWallKeys.push(a ? a.wallKey : this.pickFromTuple(this.cfg.room));
         roomFloorKeys.push(a ? a.floorKey : this.pickFromTuple(this.cfg.roomFloor));
       }
+      roomEnvs.push(a?.environments ?? []);
     }
 
     const floorMaskAll = this.orMany([corridorMask, ...roomInteriorMasks]);
@@ -113,11 +117,43 @@ export class AutoTileRenderer {
       { [this.cfg.floor]: tilesetsCorridor[this.cfg.floor], ...tilesetsRoomFlr }
     );
 
+    const envGroups: Record<string, { collidable: boolean; sources: MaskSource[] }> = {};
+    for (const key of envKeys) envGroups[key] = { collidable: false, sources: [] };
+
+    for (let i = 0; i < rooms.length; i++) {
+      const r = rooms[i];
+      const L = r.getLeft(), T = r.getTop(), R = r.getRight(), B = r.getBottom();
+      const interior = roomInteriorMasks[i];
+
+      for (const env of roomEnvs[i]) {
+        if (!env.element || !env.data.length || !env.data[0]?.length) continue;
+        const mask = this.placeEnvMaskCentered(env.data, interior, L, T, R, B);
+        if (!envGroups[env.element]) envGroups[env.element] = { collidable: env.collision, sources: [] };
+        envGroups[env.element].sources.push({ mask, tilesetKey: env.element });
+        if (env.collision) envGroups[env.element].collidable = true;
+      }
+    }
+
+    let envZ = 2;
+    for (const element of Object.keys(envGroups)) {
+      const group = envGroups[element];
+      if (!group.sources.length) continue;
+      const layer = map.createBlankLayer(`Env_${element}`, [tilesetsEnv[element]].filter(Boolean), envZ++) as Phaser.Tilemaps.TilemapLayer;
+      const combined = this.orMany(group.sources.map(s => s.mask));
+      this.paintCompositeAutotile(
+        layer,
+        combined,
+        group.sources,
+        group.collidable,
+        { [element]: tilesetsEnv[element] }
+      );
+    }
+
     return { map };
   }
 
-  private assignPrefabs(roomCount: number): Array<null | { wallKey: string; floorKey: string; shape?: number[][] }> {
-    const res: Array<null | { wallKey: string; floorKey: string; shape?: number[][] }> = new Array(roomCount).fill(null);
+  private assignPrefabs(roomCount: number): Array<null | { wallKey: string; floorKey: string; shape?: number[][]; environments?: EnvDef[] }> {
+    const res: Array<null | { wallKey: string; floorKey: string; shape?: number[][]; environments?: EnvDef[] }> = new Array(roomCount).fill(null);
     const list = this.cfg.roomPrefabs ?? [];
     if (!list.length || roomCount === 0) return res;
 
@@ -151,7 +187,7 @@ export class AutoTileRenderer {
     }
 
     for (const t of targets) {
-      for (const i of t.idxs) res[i] = { wallKey: t.prefab.wallKey, floorKey: t.prefab.floorKey, shape: t.prefab.shape };
+      for (const i of t.idxs) res[i] = { wallKey: t.prefab.wallKey, floorKey: t.prefab.floorKey, shape: t.prefab.shape, environments: t.prefab.environments };
     }
     return res;
   }
@@ -254,6 +290,24 @@ export class AutoTileRenderer {
     const out = this.makeMask(false);
     for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) out[y][x] = !!a?.[y]?.[x] && !b?.[y]?.[x];
     return out;
+  }
+
+  private placeEnvMaskCentered(envData: number[][], interior: BoolGrid, L: number, T: number, R: number, B: number): BoolGrid {
+    const m = this.makeMask(false);
+    const rw = R - L + 1, rh = B - T + 1;
+    const sw = envData[0].length, sh = envData.length;
+    const offX = L + Math.floor((rw - sw) / 2);
+    const offY = T + Math.floor((rh - sh) / 2);
+    for (let y = 0; y < sh; y++) {
+      const gy = offY + y;
+      if (gy < 0 || gy >= this.h) continue;
+      for (let x = 0; x < sw; x++) {
+        const gx = offX + x;
+        if (gx < 0 || gx >= this.w) continue;
+        if (envData[y]?.[x] === 1 && interior[gy][gx]) m[gy][gx] = true;
+      }
+    }
+    return m;
   }
 
   private paintCompositeAutotile(

@@ -9,10 +9,8 @@ const cfg: AutoTileConfig = {
   roomFloor: ['glass', 'iron', 'tree', 'ground'],
   floor: 'iron',
   floorWall: 'wall',
-  background: 'iron',
   roomPrefabs,
-};
-
+}
 
 export class Game extends Base {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
