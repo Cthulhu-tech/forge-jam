@@ -20,7 +20,7 @@ export const INDEX_ARRS: number[][] = [
   [34, 33, 28, 27], // 1111
 ];
 
-export const roomPrefabs = [
+export const roomPrefabs: RoomPrefab[] = [
   {
     wallKey: 'library',
     floorKey: 'tree',
@@ -30,7 +30,7 @@ export const roomPrefabs = [
   },
   {
     wallKey: 'medic', // - общий вид стен комнат
-    floorKey: 'medic', // - общий вид пола комнат
+    floorKey: 'glass', // - общий вид пола комнат
     shape: [
       [1, 1, 1],
       [1, 1, 1],
@@ -73,6 +73,7 @@ export const roomPrefabs = [
   {
     wallKey: 'start',
     floorKey: 'glass',
+    percent: 100,
     shape: [
       [1, 1, 1],
       [1, 1, 1],
@@ -111,11 +112,11 @@ export const roomPrefabs = [
       }
     ],
     count: 1,
-    max: 1
+    max: 1,
   },
   {
     wallKey: 'end',
-    floorKey: 'medic',
+    floorKey: 'glass',
     shape: [
       [1, 1, 1],
       [1, 1, 1],
@@ -196,6 +197,5 @@ export const roomPrefabs = [
         collision: true, // - колизия на элемент
       }
     ],
-    weight: 1 
   }
 ];

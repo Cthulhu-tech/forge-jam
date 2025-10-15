@@ -6,8 +6,8 @@ const cfg: AutoTileConfig = {
   subTile: SUBTILE,
   indexArrs: INDEX_ARRS,
   room: ['library', 'medic', 'start', 'end'],
-  roomFloor: ['glass', 'iron', 'tree', 'ground'],
-  floor: 'iron',
+  roomFloor: ['glass', 'iron', 'tree'],
+  floor: 'ground',
   floorWall: 'wall',
   roomPrefabs,
 }
@@ -23,7 +23,7 @@ export class Game extends Base {
       .sprite(16, 32, 'player', 0)
       .setOrigin(0.5, 1);
 
-    const renderer = new AutoTileRenderer(this, cfg, 55, 55, 12345);
+    const renderer = new AutoTileRenderer(this, cfg, 55, 55, 1234);
     const { map } = renderer.createTilemap();
 
     this.gridEngine.create(map, {
@@ -31,8 +31,8 @@ export class Game extends Base {
           id: 'player',
           sprite: playerSprite,
           startPosition: {
-            x: 28,
-            y: 24,
+            x: 48,
+            y: 18,
           },
           speed: 20,
           walkingAnimationMapping: 8

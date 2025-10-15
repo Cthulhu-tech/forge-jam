@@ -1,19 +1,29 @@
 type BoolGrid = boolean[][];
 type NumGrid = number[][];
-type RotCorridor = {
-  create(cb: (x: number, y: number) => void): void
-}
-
-type RotRoomRect = {
-  getLeft(): number;
-  getRight(): number;
-  getTop(): number;
-  getBottom(): number
-}
-
 type MaskSource = {
   mask: BoolGrid;
-  tilesetKey: string
+  tilesetKey: string;
+}
+
+type AutoTileConfig = {
+  subTile: number;
+  room: readonly string[];
+  roomFloor: readonly string[];
+  floor: string;
+  floorWall: string;
+  roomPrefabs?: RoomPrefab[];
+  indexArrs?: number[][];
+}
+
+type RoomPrefab = {
+  wallKey: string;
+  floorKey: string;
+  shape?: number[][];
+  environments?: EnvDef[];
+  percent?: number;
+  count?: number;
+  min?: number;
+  max?: number;
 }
 
 type EnvDef = {
@@ -22,23 +32,13 @@ type EnvDef = {
   collision: boolean;
 }
 
-type RoomPrefab = {
-  wallKey: string;
-  floorKey: string;
-  shape?: number[][];
-  percent?: number;
-  count?: number;
-  min?: number;
-  max?: number;
-  environments?: EnvDef[];
+type RotRoomRect = {
+  getLeft(): number;
+  getTop(): number;
+  getRight(): number;
+  getBottom(): number;
 }
 
-type AutoTileConfig = {
-  subTile: number;
-  indexArrs: number[][];
-  room: readonly string[];
-  roomFloor: readonly string[];
-  floor: string;
-  floorWall: string;
-  roomPrefabs?: RoomPrefab[];
+type RotCorridor = {
+  create(cb: (x: number, y: number) => void): void;
 }
