@@ -108,4 +108,16 @@ export class MaskOps {
     }
     return m;
   }
+
+  filterByWhitelist(mask: BoolGrid, whitelist: Readonly<Record<string, number>>): BoolGrid {
+    const out = this.makeMask(false);
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        if (!mask[y][x]) continue;
+        const key = `${x},${y}`;
+        if (whitelist[key]) out[y][x] = true;
+      }
+    }
+    return out;
+  }
 }

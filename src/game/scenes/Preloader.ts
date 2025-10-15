@@ -27,6 +27,7 @@ export class Preloader extends Base {
         this.load.image("start", "game/Tiles/start.png");
         this.load.image("tree", "game/Tiles/tree.png");
         this.load.image("wall", "game/Tiles/wall.png");
+        this.load.image("door", "game/Tiles/door.png");
     }
 
     create () {

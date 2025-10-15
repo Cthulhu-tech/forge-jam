@@ -9,6 +9,7 @@ type AutoTileConfig = {
   subTile: number;
   room: readonly string[];
   roomFloor: readonly string[];
+  door: string[];
   floor: string;
   floorWall: string;
   roomPrefabs?: RoomPrefab[];

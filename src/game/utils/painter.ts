@@ -12,7 +12,8 @@ export class Painter {
     tilesetMap: Record<string, Phaser.Tilemaps.Tileset>,
     floorOwner: (string | null)[][] | null,
     corridorFloorKey: string | null,
-    corridorWallKey: string | null
+    corridorWallKey: string | null,
+    wallForFloor?: Record<string, string>
   ) {
     const ids: NumGrid = combinedMask.map(r => r.map(v => (v ? 1 : 0)));
     const lastKeyAt = (x: number, y: number) => {
@@ -20,10 +21,27 @@ export class Painter {
       for (const s of sources) if (s.mask?.[y]?.[x]) key = s.tilesetKey;
       return key;
     };
-    const corrAt = (cx: number, cy: number) => {
-      if (!floorOwner || !corridorFloorKey) return false;
-      if (cy < 0 || cy >= this.h || cx < 0 || cx >= this.w) return false;
-      return floorOwner[cy][cx] === corridorFloorKey;
+    const ownerAt = (cx: number, cy: number): string | null => {
+      if (!floorOwner) return null;
+      if (cy < 0 || cy >= this.h || cx < 0 || cx >= this.w) return null;
+      return floorOwner[cy][cx];
+    };
+    const chooseOwner = (k1: string | null, k2: string | null, k3: string | null): string | null => {
+      const counts = new Map<string, number>();
+      const inc = (k: string | null) => { if (!k) return; counts.set(k, (counts.get(k) ?? 0) + 1); };
+      inc(k1); inc(k2); inc(k3);
+      if (!counts.size) return null;
+      let bestK: string | null = null, bestV = -1;
+      for (const [k, v] of counts) {
+        if (v > bestV || (v === bestV && bestK !== null && k < bestK)) { bestK = k; bestV = v; }
+      }
+      return bestK;
+    };
+    const wallKeyFromOwner = (okey: string | null): string | null => {
+      if (!okey) return null;
+      if (corridorFloorKey && corridorWallKey && okey === corridorFloorKey) return corridorWallKey;
+      if (wallForFloor && wallForFloor[okey]) return wallForFloor[okey];
+      return null;
     };
 
     for (let y = 0; y < this.h; y++) {
@@ -38,16 +56,21 @@ export class Painter {
         let keyBL = keyTL;
         let keyBR = keyTL;
 
-        if (corridorWallKey && corridorFloorKey && floorOwner) {
-          const tlCorr = corrAt(x, y - 1) || corrAt(x - 1, y) || corrAt(x - 1, y - 1);
-          const trCorr = corrAt(x, y - 1) || corrAt(x + 1, y) || corrAt(x + 1, y - 1);
-          const blCorr = corrAt(x, y + 1) || corrAt(x - 1, y) || corrAt(x - 1, y + 1);
-          const brCorr = corrAt(x, y + 1) || corrAt(x + 1, y) || corrAt(x + 1, y + 1);
+        if (floorOwner) {
+          const tlOwner = chooseOwner(ownerAt(x, y - 1), ownerAt(x - 1, y), ownerAt(x - 1, y - 1));
+          const trOwner = chooseOwner(ownerAt(x, y - 1), ownerAt(x + 1, y), ownerAt(x + 1, y - 1));
+          const blOwner = chooseOwner(ownerAt(x, y + 1), ownerAt(x - 1, y), ownerAt(x - 1, y + 1));
+          const brOwner = chooseOwner(ownerAt(x, y + 1), ownerAt(x + 1, y), ownerAt(x + 1, y + 1));
 
-          if (tlCorr) keyTL = corridorWallKey;
-          if (trCorr) keyTR = corridorWallKey;
-          if (blCorr) keyBL = corridorWallKey;
-          if (brCorr) keyBR = corridorWallKey;
+          const tlWall = wallKeyFromOwner(tlOwner);
+          const trWall = wallKeyFromOwner(trOwner);
+          const blWall = wallKeyFromOwner(blOwner);
+          const brWall = wallKeyFromOwner(brOwner);
+
+          if (tlWall) keyTL = tlWall;
+          if (trWall) keyTR = trWall;
+          if (blWall) keyBL = blWall;
+          if (brWall) keyBR = brWall;
         }
 
         const tsTL = keyTL ? tilesetMap[keyTL] : null;
